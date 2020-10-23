@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/user');
@@ -5,17 +6,17 @@ const ServerError = require('../errors/server-err');
 const RequestError = require('../errors/request-err');
 const NotFoundError = require('../errors/not-found-err');
 const DuplicateError = require('../errors/duplicate-err');
-const AuthError = require('../errors/auth-err');
+// const AuthError = require('../errors/auth-err');
 
 const { NODE_ENV, JWT_SECRET } = process.env;
 
 const readUsers = (req, res, next) => {
   User.find({})
-    .then((user) => {
-      if (!user) {
-        throw new ServerError('На сервере произошла ошибка');
-      }
-      res.send({ data: user });
+    .then((users) => {
+      // if (!user) {
+      //   throw new ServerError('На сервере произошла ошибка');
+      // }
+      res.send({ data: users });
     })
     .catch(next);
 };
@@ -39,25 +40,39 @@ const createUser = (req, res, next) => {
       (elem, index, array) => elem === array[0],
     )
   ) {
-    throw new RequestError('Пароль не соответствует требованиям');
+    res.status(400).send({ message: 'Пароль не соответствует требованиям' });
+    return;
   }
 
   bcrypt.hash(password, 10)
     .then((hash) => User.create({
       name, about, avatar, email, password: hash,
-    }, (err) => {
-      if (err.name === 'MongoError' && err.code === 11000) {
-        throw new DuplicateError('Повторный email');
-      } else throw new RequestError('Ошибка валидации полей пользователя');
     }))
-    .then((err, user) => {
-      res.status(201).send({
-        data: {
-          name: user.name, about: user.about, avatar: user.avatar, email: user.email,
-        },
-      });
-    })
-    .catch(next);
+    .then((user) => res.status(201).send({
+      data: {
+        name: user.name, about: user.about, avatar: user.avatar, email: user.email,
+      },
+    }))
+    .catch((err) => {
+      // let error;
+      if (err.name === 'MongoError' && err.code === 11000) {
+        next(new DuplicateError('Повторный email'));
+      } else {
+        next(new RequestError('Ошибка валидации полей пользователя'));
+      }
+    });
+  // .catch((err) => {
+  //   let errStatus;
+  //   let errMessage;
+  //   if (err.name === 'MongoError' && err.code === 11000) {
+  //     errStatus = 409;
+  //     errMessage = 'Повторный email';
+  //   } else {
+  //     errStatus = 400;
+  //     errMessage = 'Ошибка валидации полей пользователя';
+  //   }
+  //   res.status(errStatus).send({ message: errMessage });
+  // });
 };
 
 const updateUser = (req, res, next) => {
@@ -85,11 +100,14 @@ const updateUserAvatar = (req, res, next) => {
 const login = (req, res, next) => {
   const { email, password } = req.body;
 
-  return User.findUserByCredentials(email, password, next)
+  return User.findUserByCredentials(email, password)
+    // .orFail(() => {
+    //   throw new AuthError('Пользователь не найден');
+    // })
     .then((user) => {
-      if (!user) {
-        throw new AuthError('Пользователь не найден');
-      }
+      // if (!user) {
+      //   throw new AuthError('Пользователь не найден');
+      // }
       const token = jwt.sign({ _id: user.id },
         NODE_ENV === 'production' ? JWT_SECRET : 'dev-super-duper-secret',
         { expiresIn: '7d' });
@@ -98,6 +116,7 @@ const login = (req, res, next) => {
         httpOnly: true,
         sameSite: true,
       })
+        .status(200)
         .send({ message: 'Удачный логин' });
     })
     .catch(next);
