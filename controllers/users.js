@@ -1,37 +1,35 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/user');
+const ServerError = require('../errors/server-err');
+const RequestError = require('../errors/request-err');
+const NotFoundError = require('../errors/not-found-err');
+const DuplicateError = require('../errors/duplicate-err');
+const AuthError = require('../errors/auth-err');
 
 const { NODE_ENV, JWT_SECRET } = process.env;
 
-class ValidationError extends Error {
-  constructor(message) {
-    super(message);
-    this.name = 'ValidationError';
-    this.statusCode = 400;
-  }
-}
-
-const readUsers = (req, res) => {
+const readUsers = (req, res, next) => {
   User.find({})
-    .then((user) => res.send({ data: user }))
-    .catch(() => res.status(500).send({ message: 'На сервере произошла ошибка' }));
+    .then((user) => {
+      if (!user) {
+        throw new ServerError('На сервере произошла ошибка');
+      }
+      res.send({ data: user });
+    })
+    .catch(next);
 };
 
-const readUserById = (req, res) => {
-  let errStatus = 400;
+const readUserById = (req, res, next) => {
   User.findById(req.params.id)
     .orFail(() => {
-      errStatus = 404;
-      throw new ValidationError('Нет пользователя с таким id');
+      throw new NotFoundError('Нет пользователя с таким id');
     })
     .then((user) => res.send({ data: user }))
-    .catch((err) => {
-      res.status(errStatus).send({ message: err.message });
-    });
+    .catch(next);
 };
 
-const createUser = (req, res) => {
+const createUser = (req, res, next) => {
   const {
     name, about, avatar, email, password,
   } = req.body;
@@ -41,64 +39,57 @@ const createUser = (req, res) => {
       (elem, index, array) => elem === array[0],
     )
   ) {
-    res.status(400).send({ message: 'Пароль не соответствует требованиям' });
-    return;
+    throw new RequestError('Пароль не соответствует требованиям');
   }
 
   bcrypt.hash(password, 10)
     .then((hash) => User.create({
       name, about, avatar, email, password: hash,
-    }))
-    .then((user) => res.status(201).send({
-      data: {
-        name: user.name, about: user.about, avatar: user.avatar, email: user.email,
-      },
-    }))
-    .catch((err) => {
-      let errStatus;
-      let errMessage;
+    }, (err) => {
       if (err.name === 'MongoError' && err.code === 11000) {
-        errStatus = 409;
-        errMessage = 'Повторный email';
-      } else {
-        errStatus = 400;
-        errMessage = 'Ошибка валидации полей пользователя';
-      }
-      res.status(errStatus).send({ message: errMessage });
-    });
+        throw new DuplicateError('Повторный email');
+      } else throw new RequestError('Ошибка валидации полей пользователя');
+    }))
+    .then((err, user) => {
+      res.status(201).send({
+        data: {
+          name: user.name, about: user.about, avatar: user.avatar, email: user.email,
+        },
+      });
+    })
+    .catch(next);
 };
 
-const updateUser = (req, res) => {
+const updateUser = (req, res, next) => {
   const { name, about } = req.body;
-  let errStatus = 400;
 
   User.findByIdAndUpdate(req.user._id, { name, about })
     .orFail(() => {
-      errStatus = 500;
-      throw new ValidationError('Ошибка сервера - обновление не удалось сохранить');
+      throw new ServerError('Ошибка сервера - обновление не удалось сохранить');
     })
     .then(() => res.status(200).send({ data: { name, about } }))
-    .catch((err) => res.status(errStatus).send({ message: err.message }));
+    .catch(next);
 };
 
-const updateUserAvatar = (req, res) => {
+const updateUserAvatar = (req, res, next) => {
   const { avatar } = req.body;
-  let errStatus = 400;
 
   User.findByIdAndUpdate(req.user._id, { avatar })
     .orFail(() => {
-      errStatus = 500;
-      throw new ValidationError('Ошибка сервера - обновление не удалось сохранить');
+      throw new ServerError('Ошибка сервера - обновление не удалось сохранить');
     })
     .then(() => res.status(200).send({ data: { avatar } }))
-    .catch((err) => res.status(errStatus).send({ message: err.message }));
+    .catch(next);
 };
 
-const login = (req, res) => {
+const login = (req, res, next) => {
   const { email, password } = req.body;
 
-  return User.findUserByCredentials(email, password)
+  return User.findUserByCredentials(email, password, next)
     .then((user) => {
+      if (!user) {
+        throw new AuthError('Пользователь не найден');
+      }
       const token = jwt.sign({ _id: user.id },
         NODE_ENV === 'production' ? JWT_SECRET : 'dev-super-duper-secret',
         { expiresIn: '7d' });
@@ -109,11 +100,7 @@ const login = (req, res) => {
       })
         .send({ message: 'Удачный логин' });
     })
-    .catch((err) => {
-      res
-        .status(401)
-        .send({ message: err.message });
-    });
+    .catch(next);
 };
 
 module.exports = {

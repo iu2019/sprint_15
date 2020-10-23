@@ -1,53 +1,54 @@
 const Card = require('../models/card');
+const ServerError = require('../errors/server-err');
+const RequestError = require('../errors/request-err');
+const NotFoundError = require('../errors/not-found-err');
+const DuplicateError = require('../errors/duplicate-err');
 
-class ValidationError extends Error {
-  constructor(message) {
-    super(message);
-    this.name = 'ValidationError';
-    this.statusCode = 400;
-  }
-}
-
-const readCards = (req, res) => {
+const readCards = (req, res, next) => {
   Card.find({})
-    .then((card) => res.send({ data: card }))
-    .catch(() => res.status(500).send({ message: 'На сервере произошла ошибка' }));
+    .then((card) => {
+      if (!card) {
+        throw new ServerError('На сервере произошла ошибка');
+      }
+      res.send({ data: card });
+    })
+    .catch(next);
 };
 
-const createCard = (req, res) => {
+const createCard = (req, res, next) => {
   const { name, link } = req.body;
   Card.create({ name, link, owner: req.user._id })
-    .then((card) => res.status(201).send({ data: card }))
-    .catch(() => res.status(400).send({ message: 'Ошибка валидации полей карточки' }));
+    .then((card) => {
+      if (!card) {
+        throw new RequestError('Ошибка валидации полей карточки');
+      }
+      res.status(201).send({ data: card });
+    })
+    .catch(next);
 };
 
-const deleteCard = (req, res) => {
-  let errStatus = 400;
+const deleteCard = (req, res, next) => {
   Card.findById(req.params.id)
     .orFail(() => {
-      errStatus = 404;
-      throw new ValidationError('Нет карточки с таким id');
+      throw new NotFoundError('Нет карточки с таким id');
     })
     .then((card) => {
       if (req.user._id === card.owner._id.toString()) {
         const cardDeleted = card;
         Card.deleteOne(card)
           .orFail(() => {
-            errStatus = 500;
-            throw new ValidationError('Сбой сервера - удаление неуспешно');
+            throw new ServerError('Сбой сервера - удаление неуспешно');
           })
           .then(() => res.send({ data: cardDeleted }))
-          .catch((err) => res.status(errStatus).send({ message: err.message }));
+          .catch(next);
       } else {
-        errStatus = 409;
-        throw new Error('Нельзя удалить чужую карточку');
+        throw new DuplicateError('Нельзя удалить чужую карточку');
       }
     })
-    .catch((err) => res.status(errStatus).send({ message: err.message }));
+    .catch(next);
 };
 
-const setLike = (req, res) => {
-  let errStatus = 400;
+const setLike = (req, res, next) => {
   Card.findByIdAndUpdate(
     req.params.id,
     {
@@ -58,15 +59,13 @@ const setLike = (req, res) => {
     { new: true },
   )
     .orFail(() => {
-      errStatus = 404;
-      throw new ValidationError('Нет карточки с таким id');
+      throw new NotFoundError('Нет карточки с таким id');
     })
     .then((card) => res.status(200).send({ data: card }))
-    .catch((err) => res.status(errStatus).send({ message: err.message }));
+    .catch(next);
 };
 
-const removeLike = (req, res) => {
-  let errStatus = 400;
+const removeLike = (req, res, next) => {
   Card.findByIdAndUpdate(
     req.params.id,
     {
@@ -77,11 +76,10 @@ const removeLike = (req, res) => {
     { new: true },
   )
     .orFail(() => {
-      errStatus = 404;
-      throw new ValidationError('Нет карточки с таким id');
+      throw new NotFoundError('Нет карточки с таким id');
     })
     .then((card) => res.status(200).send({ data: card }))
-    .catch((err) => res.status(errStatus).send({ message: err.message }));
+    .catch(next);
 };
 
 module.exports = {
