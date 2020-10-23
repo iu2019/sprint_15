@@ -5,7 +5,7 @@ const {
   readCards, deleteCard, createCard, setLike, removeLike,
 } = require('../controllers/cards');
 
-const urlPattern = '/http[s]?://((([w-]+.)*w{2,3})|((([1-9][0-9]{0,1}|1[0-9]{2}|2[0-4][0-9]|25[0-5]).){3}([1-9][0-9]{0,1}|1[0-9]{2}|2[0-4][0-9]|25[0-5])))(:[1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]{1}|6553[0-5])?((/[w-]+)*/?#?)/';
+const urlPattern = new RegExp(/^http[s]?:\/\/((([\w-]+\.)*\w{2,3})|((([1-9][0-9]{0,1}|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([1-9][0-9]{0,1}|1[0-9]{2}|2[0-4][0-9]|25[0-5])))(:[1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]{1}|6553[0-5])?((\/[\w-]+)*\/?#?)$/);
 
 router.post('/cards',
   celebrate({
@@ -21,7 +21,7 @@ router.get('/cards', readCards);
 router.delete('/cards/:id',
   celebrate({
     params: Joi.object().keys({
-      id: Joi.string().alphanum().length(24),
+      id: Joi.string().hex().length(24),
     }).unknown(true),
   }),
   deleteCard);
@@ -29,7 +29,7 @@ router.delete('/cards/:id',
 router.put('/cards/:id/likes',
   celebrate({
     params: Joi.object().keys({
-      id: Joi.string().alphanum().length(24),
+      id: Joi.string().hex().length(24),
     }).unknown(true),
   }),
   setLike);
@@ -37,7 +37,7 @@ router.put('/cards/:id/likes',
 router.delete('/cards/:id/likes',
   celebrate({
     params: Joi.object().keys({
-      id: Joi.string().alphanum().length(24),
+      id: Joi.string().hex().length(24),
     }).unknown(true),
   }),
   removeLike);
