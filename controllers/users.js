@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/user');
@@ -6,7 +5,6 @@ const ServerError = require('../errors/server-err');
 const RequestError = require('../errors/request-err');
 const NotFoundError = require('../errors/not-found-err');
 const DuplicateError = require('../errors/duplicate-err');
-// const AuthError = require('../errors/auth-err');
 
 const { NODE_ENV, JWT_SECRET } = process.env;
 
@@ -40,7 +38,7 @@ const createUser = (req, res, next) => {
       (elem, index, array) => elem === array[0],
     )
   ) {
-    res.status(400).send({ message: 'Пароль не соответствует требованиям' });
+    next(new RequestError('Пароль не соответствует требованиям'));
     return;
   }
 
@@ -61,18 +59,6 @@ const createUser = (req, res, next) => {
         next(new RequestError('Ошибка валидации полей пользователя'));
       }
     });
-  // .catch((err) => {
-  //   let errStatus;
-  //   let errMessage;
-  //   if (err.name === 'MongoError' && err.code === 11000) {
-  //     errStatus = 409;
-  //     errMessage = 'Повторный email';
-  //   } else {
-  //     errStatus = 400;
-  //     errMessage = 'Ошибка валидации полей пользователя';
-  //   }
-  //   res.status(errStatus).send({ message: errMessage });
-  // });
 };
 
 const updateUser = (req, res, next) => {
@@ -101,13 +87,7 @@ const login = (req, res, next) => {
   const { email, password } = req.body;
 
   return User.findUserByCredentials(email, password)
-    // .orFail(() => {
-    //   throw new AuthError('Пользователь не найден');
-    // })
     .then((user) => {
-      // if (!user) {
-      //   throw new AuthError('Пользователь не найден');
-      // }
       const token = jwt.sign({ _id: user.id },
         NODE_ENV === 'production' ? JWT_SECRET : 'dev-super-duper-secret',
         { expiresIn: '7d' });

@@ -1,15 +1,15 @@
 const Card = require('../models/card');
 const ServerError = require('../errors/server-err');
-// const RequestError = require('../errors/request-err');
+const RequestError = require('../errors/request-err');
 const NotFoundError = require('../errors/not-found-err');
 const DuplicateError = require('../errors/duplicate-err');
 
 const readCards = (req, res, next) => {
   Card.find({})
     .then((card) => {
-      // if (!card) {
-      //   throw new ServerError('На сервере произошла ошибка');
-      // }
+      if (!card) {
+        throw new ServerError('На сервере произошла ошибка');
+      }
       res.send({ data: card });
     })
     .catch(next);
@@ -17,14 +17,13 @@ const readCards = (req, res, next) => {
 
 const createCard = (req, res, next) => {
   const { name, link } = req.body;
-  const id = req.user;
-  // eslint-disable-next-line no-console
-  console.log(req.user);
+  const id = req.user._id;
+
   Card.create({ name, link, owner: id })
     .then((card) => {
-      // if (!card) {
-      //   throw new RequestError('Ошибка валидации полей карточки');
-      // }
+      if (!card) {
+        throw new RequestError('Ошибка валидации полей карточки');
+      }
       res.status(201).send({ data: card });
     })
     .catch(next);
