@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/user');
@@ -10,11 +11,11 @@ const { NODE_ENV, JWT_SECRET } = process.env;
 
 const readUsers = (req, res, next) => {
   User.find({})
-    .then((user) => {
-      if (!user) {
-        throw new ServerError('На сервере произошла ошибка');
-      }
-      res.send({ data: user });
+    .then((users) => {
+      // if (!user) {
+      //   throw new ServerError('На сервере произошла ошибка');
+      // }
+      res.send({ data: users });
     })
     .catch(next);
 };
