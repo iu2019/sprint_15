@@ -2,7 +2,7 @@ const Card = require('../models/card');
 const ServerError = require('../errors/server-err');
 const RequestError = require('../errors/request-err');
 const NotFoundError = require('../errors/not-found-err');
-const DuplicateError = require('../errors/duplicate-err');
+const ForbiddenError = require('../errors/forbidden-err');
 
 const readCards = (req, res, next) => {
   Card.find({})
@@ -21,12 +21,11 @@ const createCard = (req, res, next) => {
 
   Card.create({ name, link, owner: id })
     .then((card) => {
-      if (!card) {
-        throw new RequestError('Ошибка валидации полей карточки');
-      }
       res.status(201).send({ data: card });
     })
-    .catch(next);
+    .catch(() => {
+      next(new RequestError('Ошибка валидации полей пользователя'));
+    });
 };
 
 const deleteCard = (req, res, next) => {
@@ -44,7 +43,7 @@ const deleteCard = (req, res, next) => {
           .then(() => res.send({ data: cardDeleted }))
           .catch(next);
       } else {
-        throw new DuplicateError('Нельзя удалить чужую карточку');
+        throw new ForbiddenError('Нельзя удалить чужую карточку');
       }
     })
     .catch(next);

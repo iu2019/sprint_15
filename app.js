@@ -8,6 +8,8 @@ const urlPattern = new RegExp(/^http[s]?:\/\/((([\w-]+\.)*\w{2,3})|((([1-9][0-9]
 const { celebrate, Joi, errors } = require('celebrate');
 
 const cookieParser = require('cookie-parser');
+const rateLimit = require('express-rate-limit');
+const helmet = require('helmet');
 
 const auth = require('./middlewares/auth');
 
@@ -19,6 +21,15 @@ const { requestLogger, errorLogger } = require('./middlewares/logger');
 
 const { PORT = 3000 } = process.env;
 const app = express();
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+});
+
+const RequestError = require('./errors/request-err');
+
+app.use(apiLimiter);
+app.use(helmet());
 
 app.use(requestLogger);
 app.use(cookieParser());
@@ -39,12 +50,6 @@ mongoose.connect('mongodb://localhost:27017/mestodb', {
   useUnifiedTopology: true,
 });
 mongoose.set('runValidators', true);
-
-app.get('/crash-test', () => {
-  setTimeout(() => {
-    throw new Error('Сервер сейчас упадёт');
-  }, 0);
-});
 
 app.post('/signin',
   celebrate({
@@ -73,10 +78,8 @@ app.use('/cards', readCards);
 
 app.use(errorLogger); // подключаем логгер ошибок
 
-app.use('*', (req, res) => {
-  res.status(404).send(
-    { message: 'Ресурс не найден' },
-  );
+app.use('*', () => {
+  throw new RequestError('Ошибка в формате запроса');
 });
 
 app.use(errors()); // обработчик ошибок celebrate
@@ -84,6 +87,7 @@ app.use(errors()); // обработчик ошибок celebrate
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => { // Централизованный обработчик ошибок.
   const { statusCode = 500, message } = err;
+
   res.status(statusCode)
     .send({
       message: statusCode === 500

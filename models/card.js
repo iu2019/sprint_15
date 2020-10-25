@@ -14,7 +14,11 @@ const cardSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Здесь нужна ссылка'],
     validate: (value) => validator.isURL(value, {
-      message: 'Must be a Valid URL', protocols: ['http', 'https', 'ftp'], require_tld: true, require_protocol: true,
+
+      message: 'Must be a Valid URL',
+      protocols: ['http', 'https', 'ftp'],
+      require_tld: true,
+      require_protocol: true,
     }),
   },
   owner: {
